@@ -1,0 +1,11 @@
+Stockfish.js 19.0.1 — Stockfish 19 lite, single-threaded WebAssembly
+Copyright the Stockfish authors and Stockfish.js contributors.
+License: GNU General Public License, version 3. See STOCKFISH-LICENSE.txt.
+Project and corresponding source/build instructions:
+https://github.com/nmrugg/stockfish.js/tree/v19.0.1
+Exact distributed npm package: https://registry.npmjs.org/stockfish/-/stockfish-19.0.1.tgz
+Upstream engine: https://github.com/official-stockfish/Stockfish
+
+Fonts are bundled from @fontsource/dm-sans, @fontsource/manrope and
+@fontsource/noto-sans-arabic under the SIL Open Font License 1.1.
+See each font package's LICENSE file in node_modules for full terms.

@@ -1,0 +1,14 @@
+import ReactDOM from 'react-dom/client';
+import { registerSW } from 'virtual:pwa-register';
+import App from './App';
+import '@fontsource/dm-sans/latin-400.css';
+import '@fontsource/dm-sans/latin-500.css';
+import '@fontsource/dm-sans/latin-600.css';
+import '@fontsource/dm-sans/latin-700.css';
+import '@fontsource/manrope/latin-500.css';
+import '@fontsource/manrope/latin-800.css';
+import '@fontsource/noto-sans-arabic/arabic-400.css';
+import '@fontsource/noto-sans-arabic/arabic-600.css';
+import './styles.css';
+registerSW({ immediate: true });
+ReactDOM.createRoot(document.getElementById('root')!).render(<App />);

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+public/engine/*
+!public/engine/.gitkeep
+*.tsbuildinfo
+.env*
+test-results/
+playwright-report/

@@ -1,0 +1,88 @@
+# Sangat Chess
+
+A responsive, bilingual chess app built with React, TypeScript, Vite, chess.js, react-chessboard, and a real Stockfish 19 WebAssembly worker. No backend, API key, account, or external asset service is required.
+
+## Run
+
+Use Node.js 22.12+ (tested with Node 24) and npm.
+
+```sh
+npm ci
+npm run dev
+```
+
+Vite prints the development address. `npm ci` automatically copies the pinned Stockfish worker and WASM from the npm package into `public/engine/`. These generated engine files are ignored by Git. If install scripts are disabled, run `node scripts/copy-engine.mjs` before starting or building.
+
+## Play
+
+- **Computer:** you play White; choose Beginner (skill 0 / depth 2), Casual (skill 6 / depth 7), or Challenger (skill 16 / depth 13). These are relative difficulty levels, not calibrated Elo ratings. You can change difficulty during a game.
+- **With a friend:** share the device and alternate turns. Flip the board whenever useful.
+- Tap a piece, then a highlighted destination, or drag it. Legal captures, last moves, check, and hints are highlighted. Promotion opens a choice of queen, rook, bishop, or knight.
+- **Undo** takes back a full turn against the computer, or one move in local play. It cancels any pending computer search. **Hint** asks Stockfish for a move for the current side; it does not play it. **New game** asks before clearing a game with moves. Changing opponent starts a new game with the same confirmation.
+- Open **Keyboard board controls** below the board for a focusable button for every square. Select a source and destination using Tab and Enter/Space.
+- Toggle **اردو / English** for translated controls and tutorial content, with right-to-left Urdu layout. Chess move notation remains standard SAN.
+- **Learn the basics** covers pieces, moves, checkmate, castling, en passant, promotion, and draws.
+- Game PGN, language, opponent mode, and difficulty are saved in local storage. Clearing browser data clears them. Saving is optional; blocked browser storage does not prevent play.
+
+All legality and game results are handled by chess.js, including castling, en passant, underpromotion, checkmate, stalemate, repetition, insufficient material, and the fifty-move rule. The app automatically ends the game when chess.js reports a draw.
+
+## Verify
+
+```sh
+npm test
+npm run build
+npm run preview
+```
+
+Unit tests cover rules integration, engine move parsing, undo semantics, and saved-game recovery. The production build runs the TypeScript checker and generates the PWA service worker.
+
+Browser checks run against a production preview and exercise real Stockfish replies at all three levels, hint, tap moves, undo, persistence, language/tutorial navigation, mobile overflow, and offline reload with WASM:
+
+```sh
+# Either install Playwright Chromium:
+npx playwright install chromium
+# Set CHROMIUM_PATH to the installed executable, or use system Chromium:
+CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e
+```
+
+The test config defaults to `/usr/bin/chromium` in this cloud environment. Override `CHROMIUM_PATH` on other systems. `npm run format:check` checks formatting.
+
+## Deploy
+
+```sh
+npm ci
+npm run build
+```
+
+Upload **the entire `dist/` directory**, including `engine/`, font assets, icons, manifest, and service worker, to any static HTTPS host (Netlify, Vercel, Cloudflare Pages, GitHub Pages, or a normal web server).
+
+- Build command: `npm run build`
+- Output directory: `dist`
+- Node: 22.12+ or 24
+- Serve `.wasm` as `application/wasm` and `.js` as JavaScript. Do not rewrite engine or asset requests to `index.html`.
+- HTTPS is required for service workers and installation; localhost works for development. No cross-origin isolation headers are needed because the engine is single-threaded.
+- For a subdirectory such as GitHub Pages `/CHess-game/`, build with `BASE_PATH=/CHess-game/ npm run build`. The worker and manifest use the configured base path.
+- Serve `sw.js` and `index.html` with revalidation rather than a long immutable cache. Hashed assets can be cached long term.
+
+The production PWA precaches the app, fonts, and Stockfish JS/WASM (roughly 3 MB). Wait for **Offline ready** on the first connected visit before going offline. Computer play, local play, hints, and the tutorial then work offline. Use the install button when your browser offers it, or the browser's Install/Add to Home Screen menu (Share → Add to Home Screen in iOS Safari). The development server does not register an offline service worker; test this with the production build and preview. Automatic updates activate when a new service worker is available.
+
+No deployment has been published automatically.
+
+## Structure
+
+```text
+src/components/  Board, history, tutorial, accessible dialogs
+src/hooks/       Stockfish worker lifecycle and cancellation
+src/engine.ts    UCI protocol adapter and difficulty settings
+src/game.ts      Persistence and move/undo helpers
+src/i18n.ts      English and Urdu copy
+src/App.tsx      Game orchestration and application layout
+scripts/         Repeatable engine asset setup
+public/          PWA icons and third-party notices
+```
+
+Stockfish runs in its own worker and is terminated/recreated when a search must be canceled. Stale hint or computer results cannot alter a newer position. If the engine fails to load or times out, the app offers a retry and local play remains available.
+
+## Third-party licenses
+
+Stockfish.js is GPL-3.0. The deployed app includes `STOCKFISH-LICENSE.txt` and `THIRD-PARTY-NOTICES.txt`, with a corresponding source and build-instruction link for the exact pinned package. Preserve these notices when distributing the engine. Fonts use SIL OFL 1.1; their license texts are included under `public/licenses/`. Other dependency licenses are provided in their npm packages.

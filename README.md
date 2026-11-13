@@ -43,9 +43,26 @@ For a fresh clone, first run `git clone https://github.com/shezanshafique3440-co
 
 Use **localhost**, not a LAN IP, for HTTP development: browsers allow Secure cookies on localhost. Real deployments require HTTPS; Secure cookies are never disabled in this app.
 
+### Windows troubleshooting
+
+**`docker` is not recognized:** install [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/), follow its WSL 2 setup prompts, and restart Windows if requested. Open Docker Desktop and wait for its engine to be running. Open a new PowerShell window and run `docker --version` and `docker compose version` before continuing. If Docker Desktop is already installed, reopening PowerShell refreshes its PATH.
+
+**`password authentication failed for user "sangat"`:** PostgreSQL responded, but it did not accept the project's credentials. Before Docker starts, port 5432 may be your existing Windows PostgreSQL service. The project's Docker instance now uses host port **5433**, so that service can keep running.
+
+For an `.env` created before this port change, open `apps/server/.env` and update only these two lines (keep your existing `JWT_SECRET` and other settings):
+
+```dotenv
+DATABASE_URL=postgresql://sangat:sangat_local_only@localhost:5433/sangat?schema=public
+TEST_DATABASE_URL=postgresql://sangat:sangat_local_only@localhost:5433/sangat_test?schema=public
+```
+
+`npm run setup:env` deliberately preserves existing files, so it will not update an old port automatically. Then run `docker compose up -d --wait postgres`, `npm.cmd run db:migrate`, and `npm.cmd run dev` in order. Do not proceed past a failing command. The API now runs a real database query before announcing startup, and `/health` checks database connectivity too.
+
+If you only want local chess while setting up Docker, run `npm.cmd run dev:web`. Authentication needs the API and database.
+
 ### PostgreSQL and migrations
 
-The Compose service binds PostgreSQL to **127.0.0.1:5432**, creates the `sangat` development database and `sangat_test` test database, and keeps data in a named volume. The checked-in username/password are **local development defaults only**. A database already using port 5432 must be stopped or configured on a different port with matching `.env` URLs.
+The Compose service binds PostgreSQL to **127.0.0.1:5433**, creates the `sangat` development database and `sangat_test` test database, and keeps data in a named volume. The checked-in username/password are **local development defaults only**. The container still uses 5432 internally; host port 5433 avoids conflicting with an existing Windows PostgreSQL service. Set `POSTGRES_PORT` to use another host port and update both database URLs to match.
 
 If a pre-existing volume does not contain the test database, create it without deleting the development database:
 

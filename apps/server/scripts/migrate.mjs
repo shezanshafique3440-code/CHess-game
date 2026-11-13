@@ -10,7 +10,13 @@ const url = new URL(process.env.DATABASE_URL);
 if ((url.searchParams.get('schema') || 'public') !== 'public')
   throw new Error('These migrations target the public schema.');
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const client = await pool.connect();
+const client = await pool.connect().catch(async (error) => {
+  await pool.end();
+  console.error(
+    `Database connection failed (${error.code || 'CONNECTION_ERROR'}). Start PostgreSQL with docker compose up -d --wait postgres and check DATABASE_URL in apps/server/.env (local Docker defaults to port 5433).`,
+  );
+  process.exit(1);
+});
 try {
   await client.query('SET search_path TO public');
   await client.query('SELECT pg_advisory_lock(731349825)');

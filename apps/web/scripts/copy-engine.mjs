@@ -1,5 +1,11 @@
 import { copyFile, mkdir } from 'node:fs/promises';
-const source = new URL('../node_modules/stockfish/', import.meta.url);
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+const require = createRequire(import.meta.url);
+const source = new URL(
+  './',
+  pathToFileURL(require.resolve('stockfish/package.json')),
+);
 const destination = new URL('../public/engine/', import.meta.url);
 await mkdir(destination, { recursive: true });
 // Pin both names to the installed Stockfish version. Fail rather than ship a

@@ -1,38 +1,34 @@
 {
-  "name": "chess-sangat",
+  "name": "sangat-monorepo",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run",
-    "postinstall": "node scripts/copy-engine.mjs",
-    "test:e2e": "playwright test",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
   },
-  "dependencies": {
-    "@fontsource/dm-sans": "^5.3.0",
-    "@fontsource/manrope": "^5.3.0",
-    "@fontsource/noto-sans-arabic": "^5.3.0",
-    "chess.js": "^1.4.0",
-    "react": "^18.3.1",
-    "react-chessboard": "4.7.3",
-    "react-dom": "^18.3.1",
-    "stockfish": "19.0.1"
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names web,server \"npm run dev:web\" \"npm run dev:server\"",
+    "dev:web": "npm run dev --workspace @sangat/web",
+    "dev:server": "npm run dev --workspace @sangat/server",
+    "build": "npm run build --workspaces",
+    "preview": "npm run preview --workspace @sangat/web",
+    "test": "npm run test:web && npm run test:server",
+    "test:web": "npm test --workspace @sangat/web",
+    "test:server": "npm test --workspace @sangat/server",
+    "test:e2e": "npm run test:e2e --workspace @sangat/web",
+    "db:generate": "npm run db:generate --workspace @sangat/server",
+    "db:migrate": "npm run db:migrate --workspace @sangat/server",
+    "setup:env": "node scripts/setup-env.mjs",
+    "postinstall": "npm run db:generate && node apps/web/scripts/copy-engine.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:auth:e2e": "npm run test:auth:e2e --workspace @sangat/server"
   },
   "devDependencies": {
-    "@playwright/test": "^1.65.0",
-    "@types/node": "^22.10.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.7.0",
-    "prettier": "^3.10.1",
-    "typescript": "~5.8.3",
-    "vite": "^6.4.0",
-    "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^3.2.0"
+    "concurrently": "^9.2.0",
+    "prettier": "^3.10.1"
   }
 }

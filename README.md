@@ -1,115 +1,131 @@
-# Sangat Chess
+# Sangat Chess monorepo
 
-A responsive, bilingual chess app built with React, TypeScript, Vite, chess.js, react-chessboard, and a real Stockfish 19 WebAssembly worker. No backend, API key, account, or external asset service is required.
+An npm workspaces monorepo with the existing bilingual, offline-capable local chess app and a new authentication API. Local chess gameplay is unchanged and does not require an account or server. This step adds a protected account lobby, not online games, matchmaking, server-side move handling, or rating updates.
 
-## Run
-
-Use Node.js 22.12+ (tested with Node 24) and npm.
-
-```sh
-npm ci
-npm run dev
+```text
+apps/web/                  React + TypeScript + Vite; existing chess app
+  src/App.tsx              Existing local gameplay (unchanged)
+  src/AuthShell.tsx         Public local chess and hash-based account routes
+  src/auth/                Zustand auth store and English/Urdu auth copy
+  src/components/          Existing components plus auth/lobby screens
+apps/server/               Node + TypeScript + Express
+  src/                     API, configuration, validation
+  prisma/schema.prisma     User, Game, Move schema
+  prisma/migrations/       Checked-in SQL generated from that schema
+  scripts/                 SQL migration and isolated test runners
+  tests/                   Auth endpoint and validation tests
+scripts/setup-env.mjs       Creates local .env files and a random JWT secret
+docker-compose.yml        Local PostgreSQL 16 with persistent data
 ```
 
-Vite prints the development address. `npm ci` automatically copies the pinned Stockfish worker and WASM from the npm package into `public/engine/`. These generated engine files are ignored by Git. If install scripts are disabled, run `node scripts/copy-engine.mjs` before starting or building.
+## Local setup (Windows PowerShell)
 
-## Play
-
-- **Computer:** you play White; choose Beginner (skill 0 / depth 2), Casual (skill 6 / depth 7), or Challenger (skill 16 / depth 13). These are relative difficulty levels, not calibrated Elo ratings. You can change difficulty during a game.
-- **With a friend:** share the device and alternate turns. Flip the board whenever useful.
-- Tap a piece, then a highlighted destination, or drag it. Legal captures, last moves, check, and hints are highlighted. Promotion opens a choice of queen, rook, bishop, or knight.
-- **Undo** takes back a full turn against the computer, or one move in local play. It cancels any pending computer search. **Hint** asks Stockfish for a move for the current side; it does not play it. **New game** asks before clearing a game with moves. Changing opponent starts a new game with the same confirmation.
-- Open **Keyboard board controls** below the board for a focusable button for every square. Select a source and destination using Tab and Enter/Space.
-- Toggle **اردو / English** for translated controls and tutorial content, with right-to-left Urdu layout. Chess move notation remains standard SAN.
-- **Learn the basics** covers pieces, moves, checkmate, castling, en passant, promotion, and draws.
-- Game PGN, language, opponent mode, and difficulty are saved in local storage. Clearing browser data clears them. Saving is optional; blocked browser storage does not prevent play.
-
-Board legality and automatic board results are handled by chess.js, including castling, en passant, underpromotion, checkmate, stalemate, repetition, insufficient material, and the fifty-move rule. The app automatically ends the game when chess.js reports a draw.
-
-## Clocks, results, and game tools
-
-- **Chess clock:** choose **1+0, 3+2, 5+0, 10+0, or 15+10** before starting (default 5+0). The first number is minutes per player and the second is the increment in seconds. Start explicitly with **Start clock**, or make your first move to start automatically; the first move also receives its increment. A running game's preset is locked until New game.
-- Time is calculated from timestamps, so background tabs, history review, tutorial visits, and reloading do not pause it. Running clocks continue across closing/reopening the page when local storage is available. A move at or after zero is rejected and the player whose time expires loses. This app uses a straightforward timeout loss, without adjudicating whether the opponent could theoretically mate.
-- **Undo** restores clock snapshots as well as moves and removes the undone increments. Against Stockfish it restores a full turn. Imported or pre-upgrade games have no earlier timing snapshots; undoing into that history resets both clocks to the selected preset, stopped.
-- The **Game over** modal explains checkmate, stalemate, threefold repetition, insufficient material, fifty-move draw, timeout, resignation, or agreement. Close it to review the board or start a new game. **Resign** requires confirmation. In local mode **Offer draw** asks the other player to accept or decline on the shared device. Computer draw negotiation is not implemented; draw by agreement is a local two-player feature.
-- **Sounds:** distinct generated tones for moves, captures, checks, castling, and game end. Check takes precedence over the move/capture/castling tone, with an additional ending sequence when the game finishes. Audio activates after a tap or keypress, as required by browsers. Mute/enable it under **Board & sound**. No audio downloads are required.
-- **Appearance:** Green, Brown, and Blue boards; Classic chess pieces or high-contrast Letter pieces (K/Q/R/B/N/P). Theme, piece set, and mute preferences persist on this device.
-- **Premoves:** while Stockfish thinks, tap or drag your own White piece to a destination. One queued move is highlighted in purple. It executes only if legal after the reply; otherwise it is discarded. Choose a promotion piece when needed. Cancel with **Cancel premove**. Undo, new game, import, game end, and entering history review clear the queue. Local play uses normal alternating moves.
-- **Review:** click a move in the history, or **Starting position**, to view that position without modifying the live game. Board input, hints, undo, and resignation are disabled in review. The live clocks and any pending computer reply continue. Choose **Return to live game** to resume input.
-- **PGN:** export a downloadable `.pgn`, including the game result. Import by pasting text or selecting a file (under 1 MB). Import replaces the game, switches to local play, and resets clocks; the dialog explains this before you confirm. Invalid imports leave your game untouched. Starting FEN, move numbers, Black-to-move games, and completed results are supported. PGN does not contain this app's per-move clock snapshots, sound settings, or queued premoves.
-
-All new controls, confirmations, result reasons, and errors are available in English and Urdu. Game, result, and timing metadata are stored locally alongside the existing preferences.
-
-### Windows PowerShell
-
-If PowerShell blocks `npm.ps1`, use `npm.cmd` without changing your execution policy:
+Install **Node.js 22.12+ (Node 24 recommended)**, **Git**, and **Docker Desktop**. Start Docker Desktop and use Linux containers. Run these commands from the repository root:
 
 ```powershell
 git pull
+npm.cmd run setup:env
 npm.cmd ci
+docker compose up -d --wait postgres
+npm.cmd run db:migrate
 npm.cmd run dev
 ```
 
-Open the address Vite prints (normally http://localhost:5173). For PWA/offline testing, stop dev with Ctrl+C, then run `npm.cmd run build` followed by `npm.cmd run preview` and open the printed preview address.
+For a fresh clone, first run `git clone https://github.com/shezanshafique3440-code/CHess-game.git` and `cd CHess-game`. On macOS/Linux, use `npm` in place of `npm.cmd`.
 
-## Verify
+- Open **http://localhost:5173**. Local chess is still the default screen.
+- **Sign in / Create account / Play as guest** lead to the account lobby. Direct lobby navigation redirects anonymous visitors to sign-in.
+- The API runs at **http://localhost:3001**, with a basic `/health` endpoint. Vite proxies `/api/*` to this API, removing `/api`.
+- `npm run dev` starts both applications and terminates the other process if one fails. Ctrl+C stops the servers. `docker compose stop` stops PostgreSQL without deleting data.
+- To use just the existing local chess app: `npm run dev:web`. It works when PostgreSQL or the API is unavailable, including its existing offline PWA behavior.
 
-```sh
-npm test
-npm run build
-npm run preview
+`setup:env` creates `apps/server/.env` and `apps/web/.env` only when they do not exist. It generates a random JWT secret locally and preserves existing files. It uses only built-in Node modules, so it works before dependency installation. `.env` files are ignored by Git. Both apps include `.env.example` files for manual configuration.
+
+Use **localhost**, not a LAN IP, for HTTP development: browsers allow Secure cookies on localhost. Real deployments require HTTPS; Secure cookies are never disabled in this app.
+
+### PostgreSQL and migrations
+
+The Compose service binds PostgreSQL to **127.0.0.1:5432**, creates the `sangat` development database and `sangat_test` test database, and keeps data in a named volume. The checked-in username/password are **local development defaults only**. A database already using port 5432 must be stopped or configured on a different port with matching `.env` URLs.
+
+If a pre-existing volume does not contain the test database, create it without deleting the development database:
+
+```powershell
+docker compose exec postgres createdb -U sangat sangat_test
 ```
 
-Unit tests cover clock presets, elapsed time, increments, timeout boundaries, game-over reasons, PGN results, position review, rules integration, undo semantics, and saved-game recovery. The production build runs the TypeScript checker and generates the PWA service worker.
+Prisma uses its JavaScript query engine with `@prisma/adapter-pg`. `npm ci` generates the client and copies the existing Stockfish worker/WASM into `apps/web/public/engine/`.
 
-Browser checks run against a production preview and exercise real Stockfish replies at all three levels, hint, tap moves, undo, persistence, language/tutorial navigation, mobile overflow, offline reload with WASM, clock/timeout behavior, result modals, premoves, review navigation, PGN import/export, and appearance settings:
+`npm run db:migrate` applies the checked-in Prisma-generated SQL through a small `pg` runner. It serializes runs with a PostgreSQL advisory lock, applies each migration in a transaction, and stores SHA-256 checksums in `_sangat_migrations`. It is safe to repeat and rejects edits to already-applied migrations. This avoids native Prisma schema-engine downloads and an unsupported PostgreSQL type in Prisma 6's experimental JS migration adapter. **Use this runner for deployment, not `prisma migrate deploy`; their migration ledgers are different.** Never edit an applied migration; add a new migration directory for future schema changes. These migrations currently target the `public` schema.
 
-```sh
-# Install Playwright Chromium if a system Chromium is unavailable:
-npx playwright install chromium
-npm run test:e2e
-```
+The initial SQL was generated using `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script` in `apps/server`. The Prisma config enables its JS adapter for schema generation/diff; the runtime client is built with `engineType = "client"`.
 
-The test config uses `/usr/bin/chromium` when present, otherwise Playwright’s installed Chromium. Set `CHROMIUM_PATH` to override the executable. `npm run format:check` checks formatting.
+## API
 
-## Deploy
+All paths below are relative to the API origin; use `/api/auth/...` through the web development proxy. Responses use `{ user: ... }`, or `{ code: ... }` for errors. Password hashes and JWTs are never returned in JSON.
+
+| Method | Path             | Body                                                                                           | Success                                         |
+| ------ | ---------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| POST   | `/auth/register` | `{ "username": "player_one", "email": "player@example.com", "password": "a-unique-password" }` | 201 + session cookie                            |
+| POST   | `/auth/login`    | `{ "email": "player@example.com", "password": "a-unique-password" }`                           | 200 + session cookie                            |
+| POST   | `/auth/guest`    | `{}`                                                                                           | 201 + temporary guest + session cookie          |
+| POST   | `/auth/logout`   | none                                                                                           | 204 + cleared cookie                            |
+| GET    | `/auth/me`       | none                                                                                           | 200 + current user; 401 without a valid session |
+
+- Zod validates strict payloads. Usernames are normalized to lowercase and contain 3–24 ASCII letters/numbers/underscores; the `guest_` prefix is reserved. Emails are trimmed and lowercased. Passwords contain 8–128 characters and are not trimmed.
+- Passwords use Argon2id (19 MiB memory, 2 iterations, parallelism 1). Login failures do not distinguish an unknown email from an incorrect password.
+- Sessions use HS256 JWTs with issuer/audience validation in a **Secure, HttpOnly, SameSite=Lax, host-only** cookie. Signed-in state lives in a Zustand memory store and is restored through `/auth/me`; tokens are not stored in JavaScript/localStorage. Account API responses are `no-store` and are not cached by the PWA.
+- Registered sessions last seven days. Logout clears the cookie and increments the user's `authVersion`, invalidating all their existing sessions, including replayed tokens.
+- Guests get random unique names, no email/password, and a 24-hour expiry. Expired guests cannot authenticate, even with an unexpired token. Guest records are not automatically deleted because they may be referenced by games; background cleanup is outside this step. Guest-to-member conversion is not implemented.
+- Auth routes share a limit of 60 requests / 15 minutes per IP. Account/guest creation additionally shares 15 requests / hour; failed logins have a 10 / 15 minute limit. Limit responses are JSON with HTTP 429. The current stores are per-process memory; multi-instance deployment needs a shared rate-limit store.
+- CORS permits the exact configured `WEB_ORIGIN` with credentials. POST requests with a different Origin are rejected. SameSite cookies and the Origin check protect browser mutations; CLI requests without an Origin are allowed.
+
+### Schema
+
+`User` contains the requested identity, unique username/email, password hash, default 1200 rating, and creation timestamp, plus `isGuest`, `expiresAt`, and `authVersion`. Email and passwordHash are nullable to represent guests; registration always supplies both.
+
+`Game` contains UUID player relations, time control, typed status/result/reason, PGN/final FEN, both players' ratings before/after, and start/end timestamps. Results, final ratings, and ending fields remain nullable until completion. `Move` contains game relation, ply, SAN, FEN and time left in milliseconds, with a unique `(gameId, ply)` constraint and cascading removal with its game. Player deletion is restricted while games reference them.
+
+The models prepare the database for future work. This API does not save local games, accept game moves, match players, or calculate ratings.
+
+## Configuration and deployment
+
+| Server variable     | Purpose                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | PostgreSQL development/deployment database URL                                     |
+| `TEST_DATABASE_URL` | Separate disposable database whose name ends in `_test`                            |
+| `JWT_SECRET`        | Random secret of at least 32 characters; placeholder values are rejected           |
+| `WEB_ORIGIN`        | Exact browser origin, no trailing slash; HTTPS required in production              |
+| `PORT`              | API port, default 3001                                                             |
+| `NODE_ENV`          | `development`, `test`, or `production`                                             |
+| `TRUST_PROXY_HOPS`  | Trusted reverse-proxy hop count, default 0; set only for your known proxy topology |
+
+Web `VITE_API_URL` defaults to `/api`. For deployment, serve the built web app over HTTPS and proxy `/api` to Express (removing the `/api` prefix), or use an HTTPS API on a **same-site** origin such as `api.example.com` with the web app at `app.example.com`. Set `VITE_API_URL` before the web build for a separate API origin, and set `WEB_ORIGIN` to the exact web origin. Unrelated cross-site domains are not supported by SameSite=Lax session cookies. No secret belongs in a `VITE_*` variable.
 
 ```sh
 npm ci
 npm run build
+npm run db:migrate
+npm run start --workspace @sangat/server
 ```
 
-Upload **the entire `dist/` directory**, including `engine/`, font assets, icons, manifest, and service worker, to any static HTTPS host (Netlify, Vercel, Cloudflare Pages, GitHub Pages, or a normal web server).
+Set production environment variables before starting the server. Web output is **apps/web/dist**; server output is **apps/server/dist**. See [local chess/PWA documentation](apps/web/README.md) for gameplay, Stockfish assets, offline checks, subdirectory builds and third-party licenses. Do not cache auth requests in a reverse proxy or CDN. No application deployment has been published automatically.
 
-- Build command: `npm run build`
-- Output directory: `dist`
-- Node: 22.12+ or 24
-- Serve `.wasm` as `application/wasm` and `.js` as JavaScript. Do not rewrite engine or asset requests to `index.html`.
-- HTTPS is required for service workers and installation; localhost works for development. No cross-origin isolation headers are needed because the engine is single-threaded.
-- For a subdirectory such as GitHub Pages `/CHess-game/`, build with `BASE_PATH=/CHess-game/ npm run build`. The worker and manifest use the configured base path.
-- Serve `sw.js` and `index.html` with revalidation rather than a long immutable cache. Hashed assets can be cached long term.
+## Tests
 
-The production PWA precaches the app, fonts, and Stockfish JS/WASM (roughly 3 MB). Wait for **Offline ready** on the first connected visit before going offline. Computer play, local play, hints, and the tutorial then work offline. Use the install button when your browser offers it, or the browser's Install/Add to Home Screen menu (Share → Add to Home Screen in iOS Safari). The development server does not register an offline service worker; test this with the production build and preview. Automatic updates activate when a new service worker is available.
+With PostgreSQL running and `.env` files created:
 
-No deployment has been published automatically.
-
-## Structure
-
-```text
-src/components/  Board, history, clocks, PGN tools, settings, accessible dialogs
-src/hooks/       Stockfish lifecycle, clock snapshots, and generated sounds
-src/engine.ts    UCI protocol adapter and difficulty settings
-src/game.ts      Persistence and move/undo helpers
-src/clock.ts     Pure timestamp-based clock transitions
-src/results.ts   Game-over classification, review, PGN results
-src/i18n.ts      English and Urdu copy
-src/App.tsx      Game orchestration and application layout
-scripts/         Repeatable engine asset setup
-public/          PWA icons and third-party notices
+```powershell
+npm.cmd test
+npm.cmd run build
+npm.cmd run test:e2e
+npm.cmd run test:auth:e2e
+npm.cmd run format:check
 ```
 
-Stockfish runs in its own worker and is terminated/recreated when a search must be canceled. Stale hint or computer results cannot alter a newer position. If the engine fails to load or times out, the app offers a retry and local play remains available.
+- `npm test`: existing web unit tests, then auth endpoint/validation tests against **real PostgreSQL**.
+- `npm run test:e2e`: existing local chess browser tests against a production preview, including offline Stockfish play.
+- `npm run test:auth:e2e`: browser tests for protected lobby, register/login/logout, guest sessions, real Secure cookies, reload restoration, Urdu UI and local chess access. They start their own API (3002) and web (5174) against the test database.
+- Server test runners refuse a database not ending in `_test`, or one matching the development database. Auth endpoint tests clear test tables; never put real data in the test database.
+- Browser tests use `/usr/bin/chromium` when present, otherwise Playwright Chromium. Install it with `npx.cmd playwright install chromium` on Windows (`npx playwright install chromium` elsewhere), or set `CHROMIUM_PATH` to your browser executable.
 
-## Third-party licenses
-
-Stockfish.js is GPL-3.0. The deployed app includes `STOCKFISH-LICENSE.txt` and `THIRD-PARTY-NOTICES.txt`, with a corresponding source and build-instruction link for the exact pinned package. Preserve these notices when distributing the engine. Fonts use SIL OFL 1.1; their license texts are included under `public/licenses/`. Other dependency licenses are provided in their npm packages.
+For focused runs: `npm run test:web` or `npm run test:server`. If dependency installation scripts were disabled, run `npm run db:generate` and `node apps/web/scripts/copy-engine.mjs` before building.

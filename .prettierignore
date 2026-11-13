@@ -1,7 +1,9 @@
 node_modules
 dist
-public/engine
-public/STOCKFISH-LICENSE.txt
+apps/web/public/engine
+apps/web/public/STOCKFISH-LICENSE.txt
 package-lock.json
 test-results
 playwright-report
+
+apps/server/prisma/migrations

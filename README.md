@@ -24,7 +24,33 @@ Vite prints the development address. `npm ci` automatically copies the pinned St
 - **Learn the basics** covers pieces, moves, checkmate, castling, en passant, promotion, and draws.
 - Game PGN, language, opponent mode, and difficulty are saved in local storage. Clearing browser data clears them. Saving is optional; blocked browser storage does not prevent play.
 
-All legality and game results are handled by chess.js, including castling, en passant, underpromotion, checkmate, stalemate, repetition, insufficient material, and the fifty-move rule. The app automatically ends the game when chess.js reports a draw.
+Board legality and automatic board results are handled by chess.js, including castling, en passant, underpromotion, checkmate, stalemate, repetition, insufficient material, and the fifty-move rule. The app automatically ends the game when chess.js reports a draw.
+
+## Clocks, results, and game tools
+
+- **Chess clock:** choose **1+0, 3+2, 5+0, 10+0, or 15+10** before starting (default 5+0). The first number is minutes per player and the second is the increment in seconds. Start explicitly with **Start clock**, or make your first move to start automatically; the first move also receives its increment. A running game's preset is locked until New game.
+- Time is calculated from timestamps, so background tabs, history review, tutorial visits, and reloading do not pause it. Running clocks continue across closing/reopening the page when local storage is available. A move at or after zero is rejected and the player whose time expires loses. This app uses a straightforward timeout loss, without adjudicating whether the opponent could theoretically mate.
+- **Undo** restores clock snapshots as well as moves and removes the undone increments. Against Stockfish it restores a full turn. Imported or pre-upgrade games have no earlier timing snapshots; undoing into that history resets both clocks to the selected preset, stopped.
+- The **Game over** modal explains checkmate, stalemate, threefold repetition, insufficient material, fifty-move draw, timeout, resignation, or agreement. Close it to review the board or start a new game. **Resign** requires confirmation. In local mode **Offer draw** asks the other player to accept or decline on the shared device. Computer draw negotiation is not implemented; draw by agreement is a local two-player feature.
+- **Sounds:** distinct generated tones for moves, captures, checks, castling, and game end. Check takes precedence over the move/capture/castling tone, with an additional ending sequence when the game finishes. Audio activates after a tap or keypress, as required by browsers. Mute/enable it under **Board & sound**. No audio downloads are required.
+- **Appearance:** Green, Brown, and Blue boards; Classic chess pieces or high-contrast Letter pieces (K/Q/R/B/N/P). Theme, piece set, and mute preferences persist on this device.
+- **Premoves:** while Stockfish thinks, tap or drag your own White piece to a destination. One queued move is highlighted in purple. It executes only if legal after the reply; otherwise it is discarded. Choose a promotion piece when needed. Cancel with **Cancel premove**. Undo, new game, import, game end, and entering history review clear the queue. Local play uses normal alternating moves.
+- **Review:** click a move in the history, or **Starting position**, to view that position without modifying the live game. Board input, hints, undo, and resignation are disabled in review. The live clocks and any pending computer reply continue. Choose **Return to live game** to resume input.
+- **PGN:** export a downloadable `.pgn`, including the game result. Import by pasting text or selecting a file (under 1 MB). Import replaces the game, switches to local play, and resets clocks; the dialog explains this before you confirm. Invalid imports leave your game untouched. Starting FEN, move numbers, Black-to-move games, and completed results are supported. PGN does not contain this app's per-move clock snapshots, sound settings, or queued premoves.
+
+All new controls, confirmations, result reasons, and errors are available in English and Urdu. Game, result, and timing metadata are stored locally alongside the existing preferences.
+
+### Windows PowerShell
+
+If PowerShell blocks `npm.ps1`, use `npm.cmd` without changing your execution policy:
+
+```powershell
+git pull
+npm.cmd ci
+npm.cmd run dev
+```
+
+Open the address Vite prints (normally http://localhost:5173). For PWA/offline testing, stop dev with Ctrl+C, then run `npm.cmd run build` followed by `npm.cmd run preview` and open the printed preview address.
 
 ## Verify
 
@@ -34,18 +60,17 @@ npm run build
 npm run preview
 ```
 
-Unit tests cover rules integration, engine move parsing, undo semantics, and saved-game recovery. The production build runs the TypeScript checker and generates the PWA service worker.
+Unit tests cover clock presets, elapsed time, increments, timeout boundaries, game-over reasons, PGN results, position review, rules integration, undo semantics, and saved-game recovery. The production build runs the TypeScript checker and generates the PWA service worker.
 
-Browser checks run against a production preview and exercise real Stockfish replies at all three levels, hint, tap moves, undo, persistence, language/tutorial navigation, mobile overflow, and offline reload with WASM:
+Browser checks run against a production preview and exercise real Stockfish replies at all three levels, hint, tap moves, undo, persistence, language/tutorial navigation, mobile overflow, offline reload with WASM, clock/timeout behavior, result modals, premoves, review navigation, PGN import/export, and appearance settings:
 
 ```sh
-# Either install Playwright Chromium:
+# Install Playwright Chromium if a system Chromium is unavailable:
 npx playwright install chromium
-# Set CHROMIUM_PATH to the installed executable, or use system Chromium:
-CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e
+npm run test:e2e
 ```
 
-The test config defaults to `/usr/bin/chromium` in this cloud environment. Override `CHROMIUM_PATH` on other systems. `npm run format:check` checks formatting.
+The test config uses `/usr/bin/chromium` when present, otherwise Playwright’s installed Chromium. Set `CHROMIUM_PATH` to override the executable. `npm run format:check` checks formatting.
 
 ## Deploy
 
@@ -71,10 +96,12 @@ No deployment has been published automatically.
 ## Structure
 
 ```text
-src/components/  Board, history, tutorial, accessible dialogs
-src/hooks/       Stockfish worker lifecycle and cancellation
+src/components/  Board, history, clocks, PGN tools, settings, accessible dialogs
+src/hooks/       Stockfish lifecycle, clock snapshots, and generated sounds
 src/engine.ts    UCI protocol adapter and difficulty settings
 src/game.ts      Persistence and move/undo helpers
+src/clock.ts     Pure timestamp-based clock transitions
+src/results.ts   Game-over classification, review, PGN results
 src/i18n.ts      English and Urdu copy
 src/App.tsx      Game orchestration and application layout
 scripts/         Repeatable engine asset setup

@@ -1,5 +1,24 @@
+import { useClock } from './hooks/useClock';
+import { useSound } from './hooks/useSound';
+import {
+  rulesResult,
+  timeoutResult,
+  positionAt,
+  exportPgn,
+  resultFromPgn,
+  type GameResult,
+} from './results';
+import { ClockPanel } from './components/ClockPanel';
+import {
+  BoardSettings,
+  themes,
+  type Theme,
+  type PieceSet,
+} from './components/BoardSettings';
+import { GameOverModal, resultText } from './components/GameOverModal';
+import { PgnTools } from './components/PgnTools';
 import { ArrowIcon } from './components/ArrowIcon';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chess, type Square } from 'chess.js';
 import { GameBoard } from './components/GameBoard';
 import { MoveHistory } from './components/MoveHistory';
@@ -7,7 +26,6 @@ import { Tutorial } from './components/Tutorial';
 import { Dialog } from './components/Dialog';
 import { useEngine } from './hooks/useEngine';
 import {
-  applyUci,
   getSetting,
   restoreGame,
   saveSetting,
@@ -47,6 +65,69 @@ export default function App() {
   const revision = useRef(0);
   const { status, search, reset } = useEngine();
   const t = translations[language];
+  const timer = useClock(game.pgn(), game.turn());
+  const sound = useSound();
+  const [theme, setTheme] = useState<Theme>(() => {
+    const value = getSetting('sangat-theme', 'green');
+    return value in themes ? (value as Theme) : 'green';
+  });
+  const [pieces, setPieces] = useState<PieceSet>(
+    getSetting('sangat-pieces', 'classic') === 'letters'
+      ? 'letters'
+      : 'classic',
+  );
+  const [review, setReview] = useState<number | null>(null);
+  const [premove, setPremove] = useState<{
+    from: Square;
+    to: Square;
+    promotion?: string;
+  } | null>(null);
+  const [manualResult, setManualResult] = useState<GameResult | null>(() => {
+    try {
+      const saved = JSON.parse(getSetting('sangat-result', 'null'));
+      if (
+        saved?.pgn === game.pgn() &&
+        ['resign', 'agreement', 'importedResult'].includes(
+          saved.result?.reason,
+        ) &&
+        [null, 'w', 'b'].includes(saved.result.winner)
+      )
+        return saved.result;
+    } catch {
+      /* Optional metadata. */
+    }
+    return resultFromPgn(game);
+  });
+  const result =
+    rulesResult(game) ||
+    (timer.clock.flagged ? timeoutResult(timer.clock.flagged) : manualResult);
+  const resultKey = result ? `${result.reason}:${result.winner}` : '';
+  const [showResult, setShowResult] = useState(false);
+  const [confirmation, setConfirmation] = useState<'resign' | 'draw' | null>(
+    null,
+  );
+  const displayGame = useMemo(
+    () => (review === null ? game : positionAt(game, review)),
+    [fen, review],
+  );
+  useEffect(() => {
+    if (result) {
+      timer.stop();
+      reset();
+      revision.current++;
+      setShowResult(true);
+      setPromotion(null);
+      setPremove(null);
+      setConfirmation(null);
+      setNewMode(null);
+      sound.play('end');
+    } else setShowResult(false);
+    saveSetting(
+      'sangat-result',
+      JSON.stringify({ pgn: game.pgn(), result: manualResult }),
+    );
+  }, [resultKey, fen]);
+
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dir = language === 'ur' ? 'rtl' : 'ltr';
@@ -72,7 +153,7 @@ export default function App() {
     if (
       mode !== 'computer' ||
       game.turn() !== 'b' ||
-      game.isGameOver() ||
+      !!result ||
       status !== 'ready'
     )
       return;
@@ -80,18 +161,50 @@ export default function App() {
     void search(fen, level).then((move) => {
       if (move && version === revision.current) {
         try {
-          applyUci(game, move);
-          sync();
+          commitMove(
+            move.slice(0, 2) as Square,
+            move.slice(2, 4) as Square,
+            move[4] || 'q',
+          );
         } catch {
           reset();
         }
       }
     });
-  }, [fen, mode, level, status]); // Game is one mutable chess.js instance; fen drives renders.
+  }, [fen, mode, level, status, resultKey]); // Game is one mutable chess.js instance; fen drives renders.
+
   const locked =
-    game.isGameOver() || (mode === 'computer' && game.turn() === 'b');
+    !!result || review !== null || (mode === 'computer' && game.turn() === 'b');
+  const boardDisabled = !!result || review !== null;
+  function commitMove(from: Square, to: Square, promote = 'q'): boolean {
+    if (
+      result ||
+      !game
+        .moves({ square: from, verbose: true })
+        .some((m) => m.to === to && (!m.promotion || m.promotion === promote))
+    )
+      return false;
+    if (!timer.complete(game.turn())) return false;
+    const played = game.move({ from, to, promotion: promote });
+    sound.move(played, game.isCheck());
+    if (status === 'hint') reset();
+    sync();
+    return true;
+  }
   function move(from: Square, to: Square, promote?: string): boolean {
-    if (locked) return false;
+    if (boardDisabled) return false;
+    if (mode === 'computer' && game.turn() === 'b') {
+      const piece = game.get(from);
+      if (piece?.color !== 'w' || from === to || game.get(to)?.color === 'w')
+        return false;
+      if (piece.type === 'p' && to[1] === '8' && !promote) {
+        setPromotion({ from, to });
+        return false;
+      }
+      setPremove({ from, to, promotion: promote || 'q' });
+      setSelected(null);
+      return false;
+    }
     const legal = game
       .moves({ square: from, verbose: true })
       .filter((m) => m.to === to);
@@ -100,27 +213,77 @@ export default function App() {
       setPromotion({ from, to });
       return false;
     }
-    try {
-      game.move({ from, to, promotion: promote || 'q' });
-      if (status === 'hint') reset();
-      sync();
-      return true;
-    } catch {
-      return false;
-    }
+    return commitMove(from, to, promote);
   }
+  useEffect(() => {
+    if (
+      !premove ||
+      game.turn() !== 'w' ||
+      mode !== 'computer' ||
+      result ||
+      review !== null
+    )
+      return;
+    setPremove(null);
+    commitMove(premove.from, premove.to, premove.promotion);
+  }, [fen, premove, mode, resultKey, review]);
   function onSquare(square: Square) {
-    if (locked || promotion) return;
-    if (selected && move(selected, square)) return;
-    if (promotion) return;
+    if (boardDisabled || promotion) return;
+    if (selected) {
+      const queuing = mode === 'computer' && game.turn() === 'b';
+      if (
+        move(selected, square) ||
+        (queuing && game.get(square)?.color !== 'w')
+      )
+        return;
+    }
     const piece = game.get(square);
     setSelected(
-      piece?.color === game.turn() && selected !== square ? square : null,
+      piece?.color === (mode === 'computer' ? 'w' : game.turn()) &&
+        selected !== square
+        ? square
+        : null,
     );
+  }
+  function importGame(pgn: string) {
+    const next = new Chess();
+    next.loadPgn(pgn);
+    // Parse completely before changing any current state.
+    reset();
+    game.loadPgn(next.pgn());
+    setMode('local');
+    saveSetting('sangat-mode', 'local');
+    timer.reset(timer.clock.preset, game.turn());
+    setManualResult(resultFromPgn(next));
+    setShowResult(!!resultFromPgn(next));
+    setReview(null);
+    setPremove(null);
+    setPromotion(null);
+    sync();
+  }
+  function finish(reason: 'resign' | 'agreement') {
+    if (result) return;
+    timer.stop();
+    setManualResult({
+      reason,
+      winner:
+        reason === 'agreement'
+          ? null
+          : mode === 'computer' || game.turn() === 'w'
+            ? 'b'
+            : 'w',
+    });
+    setConfirmation(null);
   }
   function start(next: Mode) {
     reset();
     game.reset();
+    timer.reset(timer.clock.preset, 'w');
+    setManualResult(null);
+    setReview(null);
+    setPremove(null);
+    setShowResult(false);
+    setConfirmation(null);
     setMode(next);
     saveSetting('sangat-mode', next);
     sync();
@@ -128,7 +291,8 @@ export default function App() {
     setPromotion(null);
   }
   function requestNew(next: Mode) {
-    if (game.history().length) setNewMode(next);
+    if (game.history().length || timer.clock.running || result)
+      setNewMode(next);
     else start(next);
   }
   async function showHint() {
@@ -144,11 +308,12 @@ export default function App() {
     }
   }
   const side = game.turn() === 'w' ? t.white : t.black;
-  const outcome = game.isCheckmate()
-    ? `${game.turn() === 'w' ? t.black : t.white} ${t.mate}`
-    : game.isDraw()
-      ? t.draw
-      : `${side} ${t.turn}${game.isCheck() ? ` · ${t.check}!` : ''}`;
+  const outcome = result
+    ? resultText(result, t)
+    : `${side} ${t.turn}${game.isCheck() ? ` · ${t.check}!` : ''}`;
+  const historyStart = (
+    game.history({ verbose: true })[0]?.before || game.fen()
+  ).split(' ');
   const topColor = flipped ? 'w' : 'b';
   const player = (color: string) => (
     <div className="player">
@@ -171,13 +336,13 @@ export default function App() {
         <small>
           {color === 'b' && mode === 'computer'
             ? `${t[level]} · ${status === 'thinking' ? t.thinking : status === 'loading' ? t.loading : t.ready}`
-            : color === game.turn() && !game.isGameOver()
+            : color === game.turn() && !result
               ? t.ready
               : 'Sangat Chess'}
         </small>
       </div>
       <span
-        className={`turn-dot ${game.turn() === color && !game.isGameOver() ? 'active' : ''}`}
+        className={`turn-dot ${game.turn() === color && !result ? 'active' : ''}`}
       />
     </div>
   );
@@ -254,11 +419,15 @@ export default function App() {
                 </button>
               </div>
               <GameBoard
-                game={game}
+                game={displayGame}
                 selected={selected}
                 hint={hint}
                 flipped={flipped}
-                disabled={locked || !!promotion}
+                disabled={boardDisabled || !!promotion}
+                movableColor={mode === 'computer' ? 'w' : game.turn()}
+                theme={theme}
+                pieces={pieces}
+                premove={review === null ? premove : null}
                 onSquare={onSquare}
                 onDrop={move}
                 t={t}
@@ -271,10 +440,15 @@ export default function App() {
               </div>
               <div className="game-actions">
                 <button
-                  disabled={!game.history().length}
+                  disabled={!game.history().length || review !== null}
                   onClick={() => {
                     reset();
+                    const before = game.history().length;
                     undoTurn(game, mode);
+                    timer.undo(before - game.history().length, game.turn());
+                    setManualResult(null);
+                    game.setHeader('Result', '*');
+                    setPremove(null);
                     setPromotion(null);
                     sync();
                   }}
@@ -290,6 +464,44 @@ export default function App() {
                 <button onClick={() => requestNew(mode)}>
                   ＋ <span>{t.newGame}</span>
                 </button>
+              </div>
+              {review !== null && (
+                <p className="hint-message">
+                  {t.reviewing} {review}{' '}
+                  <button onClick={() => setReview(null)}>
+                    {t.livePosition}
+                  </button>
+                </p>
+              )}
+              {mode === 'computer' && !result && (
+                <p className="board-help">{t.premoveHelp}</p>
+              )}
+              {premove && (
+                <p className="hint-message">
+                  {t.premove}:{' '}
+                  <span dir="ltr">
+                    {premove.from} → {premove.to}
+                  </span>{' '}
+                  <button onClick={() => setPremove(null)}>
+                    {t.cancelPremove}
+                  </button>
+                </p>
+              )}
+              <div className="match-actions">
+                <button
+                  disabled={!!result || review !== null}
+                  onClick={() => setConfirmation('resign')}
+                >
+                  {t.resign}
+                </button>
+                {mode === 'local' && (
+                  <button
+                    disabled={!!result || review !== null}
+                    onClick={() => setConfirmation('draw')}
+                  >
+                    {t.offerDraw}
+                  </button>
+                )}
               </div>
               {hint && (
                 <p className="hint-message" role="status">
@@ -359,7 +571,49 @@ export default function App() {
                   </>
                 )}
               </section>
-              <MoveHistory moves={game.history()} t={t} />
+              <ClockPanel
+                t={t}
+                clock={timer.clock}
+                disabled={
+                  !!game.history().length || timer.clock.running || !!result
+                }
+                ended={!!result}
+                onPreset={(preset) => timer.reset(preset, game.turn())}
+                onStart={timer.start}
+              />
+              <MoveHistory
+                moves={game.history()}
+                startBlack={historyStart[1] === 'b'}
+                startNumber={Number(historyStart[5])}
+                t={t}
+                review={review}
+                onNavigate={(ply) => {
+                  setReview(ply);
+                  setSelected(null);
+                  setPremove(null);
+                  setHint(null);
+                }}
+              />
+              <PgnTools
+                t={t}
+                onImport={importGame}
+                onExport={() => exportPgn(game, result)}
+              />
+              <BoardSettings
+                t={t}
+                theme={theme}
+                pieces={pieces}
+                muted={sound.muted}
+                onMute={sound.toggle}
+                onTheme={(value) => {
+                  setTheme(value);
+                  saveSetting('sangat-theme', value);
+                }}
+                onPieces={(value) => {
+                  setPieces(value);
+                  saveSetting('sangat-pieces', value);
+                }}
+              />
               <section className="wisdom">
                 <span className="wisdom-icon">✧</span>
                 <div className="eyebrow">{t.tipTitle}</div>
@@ -394,6 +648,35 @@ export default function App() {
         )}
         <span className="footer-signature">PLAY. LEARN. REPEAT.</span>
       </footer>
+      {showResult && result && (
+        <GameOverModal
+          result={result}
+          t={t}
+          onClose={() => setShowResult(false)}
+          onNew={() => start(mode)}
+        />
+      )}
+      {confirmation && !result && (
+        <Dialog
+          title={confirmation === 'resign' ? t.resignTitle : t.drawTitle}
+          onClose={() => setConfirmation(null)}
+        >
+          <p>{confirmation === 'resign' ? t.resignText : t.drawText}</p>
+          <div className="dialog-actions">
+            <button onClick={() => setConfirmation(null)}>
+              {confirmation === 'resign' ? t.cancel : t.decline}
+            </button>
+            <button
+              className="primary"
+              onClick={() =>
+                finish(confirmation === 'resign' ? 'resign' : 'agreement')
+              }
+            >
+              {confirmation === 'resign' ? t.resign : t.acceptDraw}
+            </button>
+          </div>
+        </Dialog>
+      )}
       {promotion && (
         <Dialog title={t.promotion} onClose={() => setPromotion(null)}>
           <div className="promotion-options">

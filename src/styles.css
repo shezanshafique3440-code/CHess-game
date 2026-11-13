@@ -904,3 +904,148 @@ footer button {
     scroll-behavior: auto !important;
   }
 }
+.clock-panel,
+.board-settings {
+  padding: 20px;
+  margin-top: 18px;
+}
+.clock-panel h2,
+.board-settings h2 {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0 0 14px;
+}
+.clock-pair {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.clock-face {
+  flex: 1;
+  padding: 12px;
+  background: #eeeee5;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.clock-face span {
+  display: block;
+  font-size: 10px;
+  color: #7e8877;
+}
+.clock-face time {
+  font-size: 27px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+.clock-face.ticking {
+  border-color: #829875;
+  background: #e6ecdc;
+}
+.clock-face.low-time {
+  color: #9a3c30;
+}
+.clock-panel label,
+.board-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  margin: 12px 0;
+}
+.clock-panel p {
+  font-size: 10px;
+  color: #829075;
+  line-height: 1.8;
+}
+.clock-panel button,
+.board-settings button {
+  font-size: 11px;
+}
+select {
+  font: inherit;
+  color: inherit;
+  background: #f6f3ec;
+  border: 1px solid #d8decd;
+  padding: 7px;
+  border-radius: 5px;
+  max-width: 60%;
+}
+select:disabled {
+  opacity: 0.5;
+}
+.match-actions,
+.pgn-tools {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.match-actions button,
+.pgn-tools button {
+  background: none;
+  border: 1px solid #d8decd;
+  border-radius: 5px;
+  padding: 9px 12px;
+  font-size: 11px;
+  flex: 1;
+}
+.match-actions button {
+  color: #8b5948;
+}
+.move-row button {
+  background: none;
+  font: inherit;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+.move-row button[aria-pressed='true'] {
+  background: #cedbbd;
+}
+.history-navigation {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 14px;
+  gap: 8px;
+}
+.history-navigation button {
+  background: none;
+  font-size: 9px;
+  padding: 5px;
+  color: #617854;
+}
+.pgn-input {
+  display: block;
+  font-size: 12px;
+  margin: 16px 0;
+}
+.pgn-input textarea {
+  width: 100%;
+  margin-top: 8px;
+  font: 12px/1.6 monospace;
+  padding: 10px;
+  border: 1px solid #c5ceba;
+  border-radius: 5px;
+  resize: vertical;
+  background: #fffdf7;
+  color: #243e31;
+}
+.pgn-input input {
+  display: block;
+  max-width: 100%;
+  font: inherit;
+  margin-top: 8px;
+}
+.hint-message button {
+  font-size: 11px;
+  background: none;
+  text-decoration: underline;
+}
+.result-text {
+  font-size: 17px !important;
+  color: #284232 !important;
+}
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid #bc8a40;
+  outline-offset: 2px;
+}

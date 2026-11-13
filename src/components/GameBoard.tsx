@@ -1,3 +1,4 @@
+import { themes, type Theme, type PieceSet } from './BoardSettings';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Chessboard } from 'react-chessboard';
 import type { Chess, Square } from 'chess.js';
@@ -11,7 +12,15 @@ export function GameBoard({
   onSquare,
   onDrop,
   t,
+  theme,
+  pieces,
+  premove,
+  movableColor,
 }: {
+  movableColor: 'w' | 'b';
+  theme: Theme;
+  pieces: PieceSet;
+  premove: { from: Square; to: Square } | null;
   game: Chess;
   selected: Square | null;
   hint: string | null;
@@ -49,6 +58,10 @@ export function GameBoard({
           : 'radial-gradient(#192f2955 23%, transparent 25%)',
       };
   }
+  if (premove) {
+    styles[premove.from] = { backgroundColor: '#cba6e7aa' };
+    styles[premove.to] = { backgroundColor: '#cba6e7aa' };
+  }
   if (game.isCheck()) {
     const king = game
       .board()
@@ -71,8 +84,49 @@ export function GameBoard({
           onSquareClick={(s) => onSquare(s)}
           onPieceDrop={onDrop}
           customSquareStyles={styles}
-          customDarkSquareStyle={{ backgroundColor: '#799081' }}
-          customLightSquareStyle={{ backgroundColor: '#ece8da' }}
+          isDraggablePiece={({ piece }) =>
+            !disabled && piece[0] === movableColor
+          }
+          customPieces={
+            pieces === 'letters'
+              ? Object.fromEntries(
+                  ['w', 'b'].flatMap((color) =>
+                    ['K', 'Q', 'R', 'B', 'N', 'P'].map((letter) => [
+                      color + letter,
+                      ({ squareWidth }: { squareWidth: number }) => (
+                        <svg
+                          viewBox="0 0 100 100"
+                          width={squareWidth}
+                          height={squareWidth}
+                        >
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="35"
+                            fill={color === 'w' ? '#faf5e5' : '#243b31'}
+                            stroke={color === 'w' ? '#243b31' : '#faf5e5'}
+                            strokeWidth="3"
+                          />
+                          <text
+                            x="50"
+                            y="64"
+                            textAnchor="middle"
+                            fontFamily="sans-serif"
+                            fontSize="40"
+                            fontWeight="bold"
+                            fill={color === 'w' ? '#243b31' : '#faf5e5'}
+                          >
+                            {letter}
+                          </text>
+                        </svg>
+                      ),
+                    ]),
+                  ),
+                )
+              : undefined
+          }
+          customDarkSquareStyle={{ backgroundColor: themes[theme][0] }}
+          customLightSquareStyle={{ backgroundColor: themes[theme][1] }}
           customBoardStyle={{ borderRadius: '3px' }}
           animationDuration={180}
           showPromotionDialog={false}
